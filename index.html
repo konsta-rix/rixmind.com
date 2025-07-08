@@ -20,13 +20,13 @@
     }
     #version-label {
       position: fixed;
-      bottom: 10px;
+      bottom: 6px;
       left: 50%;
       transform: translateX(-50%);
       color: #00ccff;
       font-family: monospace;
-      font-size: 14px;
-      opacity: 0.6;
+      font-size: 10px;
+      opacity: 0.3;
       pointer-events: none;
       user-select: none;
     }
@@ -34,11 +34,10 @@
 </head>
 <body>
   <canvas id="bg"></canvas>
-  <div id="version-label">ver.006</div>
+  <div id="version-label">ver.007</div>
   <script>
     const canvas = document.getElementById("bg");
     const ctx = canvas.getContext("2d");
-
     let w, h;
     function resize() {
       w = canvas.width = window.innerWidth;
@@ -63,49 +62,69 @@
     const mouse = { x: null, y: null };
     let lastMouse = { x: null, y: null };
     let sectorClosest = [null, null, null, null];
+    const snapshots = [];
 
     document.addEventListener("mousemove", e => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;
+      lastMouse.x = e.clientX;
+      lastMouse.y = e.clientY;
+      updateSectors();
+    });
 
-      // Only recalculate if mouse moved
-      if (mouse.x !== lastMouse.x || mouse.y !== lastMouse.y) {
-        lastMouse.x = mouse.x;
-        lastMouse.y = mouse.y;
-
-        // Unfreeze previous
-        dots.forEach(dot => dot.frozen = false);
-
-        // Random cross angle
-        const angle = Math.random() * 2 * Math.PI;
-        const dist = [Infinity, Infinity, Infinity, Infinity];
-        sectorClosest = [null, null, null, null];
-
-        dots.forEach(dot => {
-          const dx = dot.x - mouse.x;
-          const dy = dot.y - mouse.y;
-          const a = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
-          const sector = Math.floor(a / (Math.PI / 2));
-          const d2 = dx * dx + dy * dy;
-          if (d2 < dist[sector]) {
-            dist[sector] = d2;
-            sectorClosest[sector] = dot;
-          }
+    document.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      if (mouse.x !== null && mouse.y !== null) {
+        snapshots.push({
+          center: { x: mouse.x, y: mouse.y },
+          dots: [...sectorClosest]
         });
-
-        // Freeze captured
-        sectorClosest.forEach(dot => { if (dot) dot.frozen = true; });
       }
     });
 
-    function drawConnection(a, b) {
-      const mx = (a.x + b.x) / 2;
-      const my = (a.y + b.y) / 2;
+    function getSector(dot, angle, mx, my) {
+      const dx = dot.x - mx;
+      const dy = dot.y - my;
+      const pointAngle = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
+      return Math.floor(pointAngle / (Math.PI / 2));
+    }
+
+    function updateSectors() {
+      const angle = Math.random() * 2 * Math.PI;
+      const dist = [Infinity, Infinity, Infinity, Infinity];
+      sectorClosest = [null, null, null, null];
+
+      dots.forEach(dot => {
+        dot.frozen = false;
+        const sector = getSector(dot, angle, mouse.x, mouse.y);
+        const dx = dot.x - mouse.x;
+        const dy = dot.y - mouse.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < dist[sector]) {
+          dist[sector] = d2;
+          sectorClosest[sector] = dot;
+        }
+      });
+      sectorClosest.forEach(dot => { if (dot) dot.frozen = true; });
+    }
+
+    function drawGumConnection(a, b, tension = 0.4) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+
+      const offset = Math.min(dist * tension, 30);
+      const cx1 = a.x + Math.cos(angle + Math.PI / 2) * offset;
+      const cy1 = a.y + Math.sin(angle + Math.PI / 2) * offset;
+      const cx2 = b.x + Math.cos(angle + Math.PI / 2) * offset;
+      const cy2 = b.y + Math.sin(angle + Math.PI / 2) * offset;
+
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
-      ctx.quadraticCurveTo(mx, my, b.x, b.y);
-      ctx.strokeStyle = 'rgba(0, 204, 255, 0.3)';
-      ctx.lineWidth = 2;
+      ctx.bezierCurveTo(cx1, cy1, cx2, cy2, b.x, b.y);
+      ctx.strokeStyle = "rgba(0, 204, 255, 0.4)";
+      ctx.lineWidth = 3;
       ctx.stroke();
     }
 
@@ -120,9 +139,9 @@
           if (dot.x < 0 || dot.x > w) dot.vx *= -1;
           if (dot.y < 0 || dot.y > h) dot.vy *= -1;
         }
-
+        const radius = Math.max(dot.r, 4); // enforce min radius
         ctx.beginPath();
-        ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
+        ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = "#00ccff";
         ctx.fill();
       });
@@ -134,9 +153,15 @@
         ctx.fill();
 
         sectorClosest.forEach(dot => {
-          if (dot) drawConnection({ x: mouse.x, y: mouse.y }, dot);
+          if (dot) drawGumConnection({ x: mouse.x, y: mouse.y }, dot);
         });
       }
+
+      snapshots.forEach(snap => {
+        snap.dots.forEach(dot => {
+          if (dot) drawGumConnection(snap.center, dot);
+        });
+      });
 
       requestAnimationFrame(draw);
     }
