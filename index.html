@@ -43,7 +43,6 @@
         r: Math.random() * 2 + 1,
         vx: Math.random() * 0.6 - 0.3,
         vy: Math.random() * 0.6 - 0.3,
-        fixed: false
       });
     }
 
@@ -57,40 +56,34 @@
       mouse.y = e.clientY;
     });
 
-    function getClosestDots(x, y, count) {
-      return [...dots]
-        .sort((a, b) => {
-          const da = (a.x - x) ** 2 + (a.y - y) ** 2;
-          const db = (b.x - x) ** 2 + (b.y - y) ** 2;
-          return da - db;
-        })
-        .slice(0, count);
-    }
-
     function drawConnection(a, b) {
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.quadraticCurveTo(mx, my, b.x, b.y);
-      ctx.strokeStyle = 'rgba(0, 204, 255, 0.2)';
+      ctx.strokeStyle = 'rgba(0, 204, 255, 0.3)';
       ctx.lineWidth = 2;
       ctx.stroke();
+    }
+
+    function getSector(dot, angle, mx, my) {
+      const dx = dot.x - mx;
+      const dy = dot.y - my;
+      const pointAngle = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
+      return Math.floor(pointAngle / (Math.PI / 2)); // 0 to 3
     }
 
     function draw() {
       ctx.fillStyle = "#001f3f";
       ctx.fillRect(0, 0, w, h);
 
-      // Update all dots unless they are fixed by the mouse
+      // Animate dots
       dots.forEach(dot => {
-        if (!dot.fixed) {
-          dot.x += dot.vx;
-          dot.y += dot.vy;
-
-          if (dot.x < 0 || dot.x > w) dot.vx *= -1;
-          if (dot.y < 0 || dot.y > h) dot.vy *= -1;
-        }
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+        if (dot.x < 0 || dot.x > w) dot.vx *= -1;
+        if (dot.y < 0 || dot.y > h) dot.vy *= -1;
 
         ctx.beginPath();
         ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
@@ -99,30 +92,35 @@
       });
 
       if (mouse.x !== null && mouse.y !== null) {
-        // Find and fix 4 closest dots
-        const captured = getClosestDots(mouse.x, mouse.y, 4);
-        dots.forEach(dot => dot.fixed = false); // release all
-        captured.forEach(dot => {
-          dot.fixed = true;
-        });
-
-        // Draw center (mouse) point
+        // Draw the central point
         ctx.beginPath();
         ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
         ctx.fillStyle = "#00ccff";
         ctx.fill();
 
-        // Draw slime-like connections
-        captured.forEach(dot => {
-          drawConnection({ x: mouse.x, y: mouse.y }, dot);
+        // Generate random angle for the cross axis
+        const angle = Math.random() * 2 * Math.PI;
+
+        // Map sector index (0–3) to closest dot
+        const sectorClosest = [null, null, null, null];
+        const sectorDist = [Infinity, Infinity, Infinity, Infinity];
+
+        // Find closest dot in each sector
+        dots.forEach(dot => {
+          const sector = getSector(dot, angle, mouse.x, mouse.y);
+          const dist = (dot.x - mouse.x) ** 2 + (dot.y - mouse.y) ** 2;
+          if (dist < sectorDist[sector]) {
+            sectorDist[sector] = dist;
+            sectorClosest[sector] = dot;
+          }
         });
 
-        // Optionally: draw connecting ring
-        for (let i = 0; i < captured.length; i++) {
-          for (let j = i + 1; j < captured.length; j++) {
-            drawConnection(captured[i], captured[j]);
+        // Draw connections
+        sectorClosest.forEach(dot => {
+          if (dot) {
+            drawConnection({ x: mouse.x, y: mouse.y }, dot);
           }
-        }
+        });
       }
 
       requestAnimationFrame(draw);
