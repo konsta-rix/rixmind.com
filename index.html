@@ -34,7 +34,7 @@
 </head>
 <body>
   <canvas id="bg"></canvas>
-  <div id="version-label">ver.011</div>
+  <div id="version-label">ver.012</div>
   <script>
     const canvas = document.getElementById("bg");
     const ctx = canvas.getContext("2d");
@@ -60,61 +60,49 @@
     }
 
     const mouse = { x: null, y: null };
-    const snapshots = [];
-    let sectorClosest = [null, null, null, null];
+    let snapshots = [];
 
-    function findClosestDots(cx, cy) {
-      const angleOffset = Math.PI / 4; // rotate so quadrants center on cardinal points
+    function getSectorAngle(index) {
+      return index * (Math.PI / 2);
+    }
+
+    function updateClosestDots(center) {
       const closest = [null, null, null, null];
-      const closestDist = [Infinity, Infinity, Infinity, Infinity];
+      const dist = [Infinity, Infinity, Infinity, Infinity];
 
-      dots.forEach(dot => {
-        const dx = dot.x - cx;
-        const dy = dot.y - cy;
-        const dist2 = dx * dx + dy * dy;
-        const angle = (Math.atan2(dy, dx) + 2 * Math.PI - angleOffset) % (2 * Math.PI);
-        const sector = Math.floor(angle / (Math.PI / 2));
+      for (const dot of dots) {
+        const dx = dot.x - center.x;
+        const dy = dot.y - center.y;
+        const angle = (Math.atan2(dy, dx) + 2 * Math.PI) % (2 * Math.PI);
+        const sector = Math.floor(angle / (Math.PI / 2)) % 4;
+        const d2 = dx * dx + dy * dy;
+
         const angleInSector = angle % (Math.PI / 2);
+        const isInMiddle30Deg = angleInSector >= Math.PI / 12 && angleInSector <= Math.PI / 3;
+        if (!isInMiddle30Deg) continue;
 
-        if (angleInSector < Math.PI / 6) {
-          if (dist2 < closestDist[sector]) {
-            closestDist[sector] = dist2;
-            closest[sector] = dot;
-          }
+        if (d2 < dist[sector]) {
+          dist[sector] = d2;
+          closest[sector] = dot;
         }
-      });
-
+      }
       return closest;
     }
 
     function drawFilledBlob(center, arms) {
-      const points = arms.filter(Boolean);
-      if (points.length < 2) return;
-
-      // Collect all vectors and sort by angle from center
-      const sorted = points.slice().sort((a, b) => {
-        const angleA = Math.atan2(a.y - center.y, a.x - center.x);
-        const angleB = Math.atan2(b.y - center.y, b.x - center.x);
-        return angleA - angleB;
-      });
+      if (arms.some(a => a === null)) return;
 
       ctx.beginPath();
-      for (let i = 0; i < sorted.length; i++) {
-        const p1 = sorted[i];
-        const p2 = sorted[(i + 1) % sorted.length];
-        const mx = (p1.x + p2.x) / 2;
-        const my = (p1.y + p2.y) / 2;
-        if (i === 0) ctx.moveTo(mx, my);
-        ctx.quadraticCurveTo(p1.x, p1.y, mx, my);
+      ctx.moveTo(arms[0].x, arms[0].y);
+      for (let i = 1; i < 4; i++) {
+        const ctrlX = center.x + (arms[i - 1].x - center.x) * 0.5 + (arms[i].x - center.x) * 0.5;
+        const ctrlY = center.y + (arms[i - 1].y - center.y) * 0.5 + (arms[i].y - center.y) * 0.5;
+        ctx.quadraticCurveTo(ctrlX, ctrlY, arms[i].x, arms[i].y);
       }
-      ctx.closePath();
-      ctx.fillStyle = "rgba(0, 204, 255, 0.4)";
-      ctx.fill();
-
-      // Center dot
-      ctx.beginPath();
-      ctx.arc(center.x, center.y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = "#00ccff";
+      const ctrlX = center.x + (arms[3].x - center.x) * 0.5 + (arms[0].x - center.x) * 0.5;
+      const ctrlY = center.y + (arms[3].y - center.y) * 0.5 + (arms[0].y - center.y) * 0.5;
+      ctx.quadraticCurveTo(ctrlX, ctrlY, arms[0].x, arms[0].y);
+      ctx.fillStyle = "#007b9c";
       ctx.fill();
     }
 
@@ -139,44 +127,36 @@
         ctx.fill();
       });
 
-      if (mouse.x !== null && mouse.y !== null) {
-        sectorClosest = findClosestDots(mouse.x, mouse.y);
-        drawFilledBlob(mouse, sectorClosest);
+      for (const snap of snapshots) {
+        drawFilledBlob(snap.center, snap.arms);
       }
-
-      snapshots.forEach(snap => {
-        drawFilledBlob(snap.center, snap.dots);
-      });
 
       requestAnimationFrame(draw);
     }
 
-    function freezeBlob(x, y) {
-      const closest = findClosestDots(x, y);
-      closest.forEach(dot => {
+    function registerSnap(center) {
+      const arms = updateClosestDots(center);
+      arms.forEach(dot => {
         if (dot) {
           dot.frozen = true;
           dot.vx /= 3;
           dot.vy /= 3;
         }
       });
-      snapshots.push({ center: { x, y }, dots: closest });
+      snapshots.push({ center, arms });
     }
 
-    document.addEventListener("mousemove", e => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
+    canvas.addEventListener("click", e => {
+      const center = { x: e.clientX, y: e.clientY };
+      registerSnap(center);
     });
-    document.addEventListener("click", e => {
-      if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
-    });
-    canvas.addEventListener("touchstart", e => {
-      const touch = e.touches[0];
-      mouse.x = touch.clientX;
-      mouse.y = touch.clientY;
-    });
+
     canvas.addEventListener("touchend", e => {
-      if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
+      if (e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        const center = { x: touch.clientX, y: touch.clientY };
+        registerSnap(center);
+      }
     });
 
     draw();
