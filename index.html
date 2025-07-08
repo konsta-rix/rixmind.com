@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>..</title>
+  <title>Organic Blob</title>
   <style>
     html, body {
       margin: 0;
@@ -60,22 +60,29 @@
     }
 
     const mouse = { x: null, y: null };
-    let sectorClosest = [null, null, null, null];
     const snapshots = [];
+    let sectorClosest = [null, null, null, null];
     let lastMousePos = { x: null, y: null };
 
-    function updateSectors() {
+    function getSector(dot, angle, cx, cy) {
+      const dx = dot.x - cx;
+      const dy = dot.y - cy;
+      const pointAngle = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
+      const withinCenter30Deg = (pointAngle % (Math.PI / 2)) >= Math.PI / 12 && (pointAngle % (Math.PI / 2)) <= Math.PI / 3;
+      if (!withinCenter30Deg) return -1;
+      return Math.floor(pointAngle / (Math.PI / 2));
+    }
+
+    function updateSectors(cx, cy) {
       const angle = Math.random() * 2 * Math.PI;
       const dist = [Infinity, Infinity, Infinity, Infinity];
       sectorClosest = [null, null, null, null];
 
       dots.forEach(dot => {
-        const dx = dot.x - mouse.x;
-        const dy = dot.y - mouse.y;
-        const pointAngle = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
-        const withinCenter30Deg = (pointAngle % (Math.PI / 2)) >= Math.PI / 12 && (pointAngle % (Math.PI / 2)) <= Math.PI / 3;
-        if (!withinCenter30Deg) return;
-        const sector = Math.floor(pointAngle / (Math.PI / 2));
+        const sector = getSector(dot, angle, cx, cy);
+        if (sector === -1) return;
+        const dx = dot.x - cx;
+        const dy = dot.y - cy;
         const d2 = dx * dx + dy * dy;
         if (d2 < dist[sector]) {
           dist[sector] = d2;
@@ -84,17 +91,31 @@
       });
     }
 
-    function drawFilledBlob(center, dots) {
-      if (dots.length !== 4 || dots.includes(null)) return;
+    function drawBlob(center, arms) {
+      const points = arms.filter(Boolean);
+      if (points.length < 2) return;
+
       ctx.beginPath();
-      ctx.moveTo(dots[0].x, dots[0].y);
-      for (let i = 1; i < 4; i++) {
-        const midX = (dots[i].x + dots[(i + 1) % 4].x) / 2;
-        const midY = (dots[i].y + dots[(i + 1) % 4].y) / 2;
-        ctx.quadraticCurveTo(dots[i].x, dots[i].y, midX, midY);
+      for (let i = 0; i < points.length; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+
+        if (i === 0) {
+          ctx.moveTo(midX, midY);
+        }
+
+        ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
       }
       ctx.closePath();
-      ctx.fillStyle = "rgba(0, 204, 255, 0.5)";
+      ctx.fillStyle = "rgba(0, 204, 255, 0.4)";
+      ctx.fill();
+
+      // Core circle
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#00ccff";
       ctx.fill();
     }
 
@@ -112,82 +133,71 @@
           dot.x += dot.vx / 3;
           dot.y += dot.vy / 3;
         }
-        const radius = Math.max(dot.r, 4);
+
         ctx.beginPath();
-        ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
+        ctx.arc(dot.x, dot.y, Math.max(dot.r, 4), 0, Math.PI * 2);
         ctx.fillStyle = "#00ccff";
         ctx.fill();
       });
 
       if (mouse.x !== null && mouse.y !== null) {
-        ctx.beginPath();
-        ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "#00ccff";
-        ctx.fill();
-        drawFilledBlob({ x: mouse.x, y: mouse.y }, sectorClosest);
+        drawBlob(mouse, sectorClosest);
       }
 
       snapshots.forEach(snap => {
-        drawFilledBlob(snap.center, snap.dots);
+        drawBlob(snap.center, snap.dots);
       });
 
       requestAnimationFrame(draw);
     }
 
+    function freezeShape(cx, cy) {
+      updateSectors(cx, cy);
+      snapshots.push({
+        center: { x: cx, y: cy },
+        dots: [...sectorClosest]
+      });
+      sectorClosest.forEach(dot => {
+        if (dot) {
+          dot.frozen = true;
+          dot.vx /= 3;
+          dot.vy /= 3;
+        }
+      });
+    }
+
+    // DESKTOP MOUSE
     document.addEventListener("mousemove", e => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;
       if (lastMousePos.x !== mouse.x || lastMousePos.y !== mouse.y) {
         lastMousePos = { x: mouse.x, y: mouse.y };
-        updateSectors();
+        updateSectors(mouse.x, mouse.y);
       }
     });
 
-    document.addEventListener("click", e => {
-      if (mouse.x !== null && mouse.y !== null) {
-        snapshots.push({
-          center: { x: mouse.x, y: mouse.y },
-          dots: [...sectorClosest]
-        });
-        sectorClosest.forEach(dot => {
-          if (dot) {
-            dot.frozen = true;
-            dot.vx /= 3;
-            dot.vy /= 3;
-          }
-        });
-      }
+    document.addEventListener("click", () => {
+      if (mouse.x !== null && mouse.y !== null) freezeShape(mouse.x, mouse.y);
     });
 
+    // MOBILE TOUCH
     canvas.addEventListener("touchstart", e => {
       const touch = e.touches[0];
       mouse.x = touch.clientX;
       mouse.y = touch.clientY;
       lastMousePos = { x: touch.clientX, y: touch.clientY };
-      updateSectors();
+      updateSectors(mouse.x, mouse.y);
     });
 
     canvas.addEventListener("touchmove", e => {
       const touch = e.touches[0];
       mouse.x = touch.clientX;
       mouse.y = touch.clientY;
-      updateSectors();
+      updateSectors(mouse.x, mouse.y);
     });
 
     canvas.addEventListener("touchend", () => {
-      if (mouse.x !== null && mouse.y !== null) {
-        snapshots.push({
-          center: { x: mouse.x, y: mouse.y },
-          dots: [...sectorClosest]
-        });
-        sectorClosest.forEach(dot => {
-          if (dot) {
-            dot.frozen = true;
-            dot.vx /= 3;
-            dot.vy /= 3;
-          }
-        });
-      }
+      if (mouse.x !== null && mouse.y !== null) freezeShape(mouse.x, mouse.y);
     });
 
     draw();
