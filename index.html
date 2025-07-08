@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>..</title>
   <style>
     html, body {
@@ -34,7 +34,7 @@
 </head>
 <body>
   <canvas id="bg"></canvas>
-  <div id="version-label">ver.008</div>
+  <div id="version-label">ver.009</div>
   <script>
     const canvas = document.getElementById("bg");
     const ctx = canvas.getContext("2d");
@@ -64,50 +64,18 @@
     const snapshots = [];
     let lastMousePos = { x: null, y: null };
 
-    document.addEventListener("mousemove", e => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-      if (lastMousePos.x !== mouse.x || lastMousePos.y !== mouse.y) {
-        lastMousePos = { x: mouse.x, y: mouse.y };
-        updateSectors();
-      }
-    });
-
-    document.addEventListener("click", e => {
-      if (mouse.x !== null && mouse.y !== null) {
-        snapshots.push({
-          center: { x: mouse.x, y: mouse.y },
-          dots: [...sectorClosest]
-        });
-        sectorClosest.forEach(dot => {
-          if (dot) {
-            dot.frozen = true;
-            dot.vx /= 10;
-            dot.vy /= 10;
-          }
-        });
-      }
-    });
-
-    function getSector(dot, angle, mx, my) {
-      const dx = dot.x - mx;
-      const dy = dot.y - my;
-      const pointAngle = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
-      const withinCenter30Deg = (pointAngle % (Math.PI / 2)) >= Math.PI / 12 && (pointAngle % (Math.PI / 2)) <= Math.PI / 3;
-      if (!withinCenter30Deg) return -1;
-      return Math.floor(pointAngle / (Math.PI / 2));
-    }
-
     function updateSectors() {
       const angle = Math.random() * 2 * Math.PI;
       const dist = [Infinity, Infinity, Infinity, Infinity];
       sectorClosest = [null, null, null, null];
 
       dots.forEach(dot => {
-        const sector = getSector(dot, angle, mouse.x, mouse.y);
-        if (sector === -1) return;
         const dx = dot.x - mouse.x;
         const dy = dot.y - mouse.y;
+        const pointAngle = (Math.atan2(dy, dx) - angle + 2 * Math.PI) % (2 * Math.PI);
+        const withinCenter30Deg = (pointAngle % (Math.PI / 2)) >= Math.PI / 12 && (pointAngle % (Math.PI / 2)) <= Math.PI / 3;
+        if (!withinCenter30Deg) return;
+        const sector = Math.floor(pointAngle / (Math.PI / 2));
         const d2 = dx * dx + dy * dy;
         if (d2 < dist[sector]) {
           dist[sector] = d2;
@@ -146,6 +114,9 @@
           dot.y += dot.vy;
           if (dot.x < 0 || dot.x > w) dot.vx *= -1;
           if (dot.y < 0 || dot.y > h) dot.vy *= -1;
+        } else {
+          dot.x += dot.vx / 3;
+          dot.y += dot.vy / 3;
         }
         const radius = Math.max(dot.r, 4);
         ctx.beginPath();
@@ -173,6 +144,62 @@
 
       requestAnimationFrame(draw);
     }
+
+    document.addEventListener("mousemove", e => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      if (lastMousePos.x !== mouse.x || lastMousePos.y !== mouse.y) {
+        lastMousePos = { x: mouse.x, y: mouse.y };
+        updateSectors();
+      }
+    });
+
+    document.addEventListener("click", e => {
+      if (mouse.x !== null && mouse.y !== null) {
+        snapshots.push({
+          center: { x: mouse.x, y: mouse.y },
+          dots: [...sectorClosest]
+        });
+        sectorClosest.forEach(dot => {
+          if (dot) {
+            dot.frozen = true;
+            dot.vx /= 3;
+            dot.vy /= 3;
+          }
+        });
+      }
+    });
+
+    canvas.addEventListener("touchstart", e => {
+      const touch = e.touches[0];
+      mouse.x = touch.clientX;
+      mouse.y = touch.clientY;
+      lastMousePos = { x: touch.clientX, y: touch.clientY };
+      updateSectors();
+    });
+
+    canvas.addEventListener("touchmove", e => {
+      const touch = e.touches[0];
+      mouse.x = touch.clientX;
+      mouse.y = touch.clientY;
+      updateSectors();
+    });
+
+    canvas.addEventListener("touchend", () => {
+      if (mouse.x !== null && mouse.y !== null) {
+        snapshots.push({
+          center: { x: mouse.x, y: mouse.y },
+          dots: [...sectorClosest]
+        });
+        sectorClosest.forEach(dot => {
+          if (dot) {
+            dot.frozen = true;
+            dot.vx /= 3;
+            dot.vy /= 3;
+          }
+        });
+      }
+    });
 
     draw();
   </script>
