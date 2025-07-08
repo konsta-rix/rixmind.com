@@ -34,7 +34,7 @@
 </head>
 <body>
   <canvas id="bg"></canvas>
-  <div id="version-label">ver.012</div>
+  <div id="version-label">ver.013</div>
   <script>
     const canvas = document.getElementById("bg");
     const ctx = canvas.getContext("2d");
@@ -60,50 +60,65 @@
     }
 
     const mouse = { x: null, y: null };
-    let snapshots = [];
+    const snapshots = [];
+    let sectorClosest = [null, null, null, null];
 
-    function getSectorAngle(index) {
-      return index * (Math.PI / 2);
-    }
-
-    function updateClosestDots(center) {
+    function findClosestDots(cx, cy) {
+      const angleOffset = Math.PI / 4;
       const closest = [null, null, null, null];
-      const dist = [Infinity, Infinity, Infinity, Infinity];
+      const closestDist = [Infinity, Infinity, Infinity, Infinity];
 
-      for (const dot of dots) {
-        const dx = dot.x - center.x;
-        const dy = dot.y - center.y;
+      dots.forEach(dot => {
+        const dx = dot.x - cx;
+        const dy = dot.y - cy;
+        const dist2 = dx * dx + dy * dy;
         const angle = (Math.atan2(dy, dx) + 2 * Math.PI) % (2 * Math.PI);
-        const sector = Math.floor(angle / (Math.PI / 2)) % 4;
-        const d2 = dx * dx + dy * dy;
-
-        const angleInSector = angle % (Math.PI / 2);
-        const isInMiddle30Deg = angleInSector >= Math.PI / 12 && angleInSector <= Math.PI / 3;
-        if (!isInMiddle30Deg) continue;
-
-        if (d2 < dist[sector]) {
-          dist[sector] = d2;
-          closest[sector] = dot;
+        const sector = Math.floor((angle - angleOffset + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 2));
+        const angleInSector = (angle - (sector * Math.PI / 2) + angleOffset) % (Math.PI / 2);
+        const minAngle = Math.PI / 8;
+        const maxAngle = 3 * Math.PI / 8;
+        if (angleInSector >= minAngle && angleInSector <= maxAngle) {
+          if (dist2 < closestDist[sector]) {
+            closestDist[sector] = dist2;
+            closest[sector] = dot;
+          }
         }
-      }
+      });
+
       return closest;
     }
 
-    function drawFilledBlob(center, arms) {
-      if (arms.some(a => a === null)) return;
+    function drawShape(center, arms, style = "#00ccff") {
+      const points = arms.filter(Boolean);
+      if (points.length < 4) return;
 
       ctx.beginPath();
-      ctx.moveTo(arms[0].x, arms[0].y);
-      for (let i = 1; i < 4; i++) {
-        const ctrlX = center.x + (arms[i - 1].x - center.x) * 0.5 + (arms[i].x - center.x) * 0.5;
-        const ctrlY = center.y + (arms[i - 1].y - center.y) * 0.5 + (arms[i].y - center.y) * 0.5;
-        ctx.quadraticCurveTo(ctrlX, ctrlY, arms[i].x, arms[i].y);
-      }
-      const ctrlX = center.x + (arms[3].x - center.x) * 0.5 + (arms[0].x - center.x) * 0.5;
-      const ctrlY = center.y + (arms[3].y - center.y) * 0.5 + (arms[0].y - center.y) * 0.5;
-      ctx.quadraticCurveTo(ctrlX, ctrlY, arms[0].x, arms[0].y);
-      ctx.fillStyle = "#007b9c";
+      points.forEach(p => {
+        ctx.moveTo(center.x, center.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.strokeStyle = style;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      });
+
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = style;
       ctx.fill();
+
+      // Draw "RM"
+      ctx.fillStyle = style;
+      ctx.font = "bold 12px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("RM", center.x, center.y);
+
+      points.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = style;
+        ctx.fill();
+      });
     }
 
     function draw() {
@@ -127,36 +142,52 @@
         ctx.fill();
       });
 
-      for (const snap of snapshots) {
-        drawFilledBlob(snap.center, snap.arms);
+      if (mouse.x !== null && mouse.y !== null) {
+        sectorClosest = findClosestDots(mouse.x, mouse.y);
+        drawShape({ x: mouse.x, y: mouse.y }, sectorClosest, "#007799"); // muted color
       }
+
+      snapshots.forEach(snap => {
+        snap.center.y += snap.vy;
+        snap.dots.forEach(dot => {
+          if (dot) dot.y += snap.vy;
+        });
+        drawShape(snap.center, snap.dots);
+      });
 
       requestAnimationFrame(draw);
     }
 
-    function registerSnap(center) {
-      const arms = updateClosestDots(center);
-      arms.forEach(dot => {
+    function freezeBlob(x, y) {
+      const closest = findClosestDots(x, y);
+      closest.forEach(dot => {
         if (dot) {
           dot.frozen = true;
           dot.vx /= 3;
           dot.vy /= 3;
         }
       });
-      snapshots.push({ center, arms });
+      snapshots.push({
+        center: { x, y },
+        dots: closest,
+        vy: -0.3
+      });
     }
 
-    canvas.addEventListener("click", e => {
-      const center = { x: e.clientX, y: e.clientY };
-      registerSnap(center);
+    document.addEventListener("mousemove", e => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
     });
-
+    document.addEventListener("click", e => {
+      if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
+    });
+    canvas.addEventListener("touchstart", e => {
+      const touch = e.touches[0];
+      mouse.x = touch.clientX;
+      mouse.y = touch.clientY;
+    });
     canvas.addEventListener("touchend", e => {
-      if (e.changedTouches.length > 0) {
-        const touch = e.changedTouches[0];
-        const center = { x: touch.clientX, y: touch.clientY };
-        registerSnap(center);
-      }
+      if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
     });
 
     draw();
