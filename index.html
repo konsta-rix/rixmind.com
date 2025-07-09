@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <title>- Rixmind -</title>
   <style>
     html, body {
@@ -35,7 +34,8 @@
 </head>
 <body>
   <canvas id="bg"></canvas>
-  <div id="version-label">ver.013</div>
+  <div id="version-label">ver.019</div>
+
   <script>
     const canvas = document.getElementById("bg");
     const ctx = canvas.getContext("2d");
@@ -49,20 +49,25 @@
 
     const dots = [];
     const NUM_DOTS = 100;
-    for (let i = 0; i < NUM_DOTS; i++) {
-      dots.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r: Math.random() * 2 + 1,
-        vx: Math.random() * 0.6 - 0.3,
-        vy: Math.random() * 0.6 - 0.3,
-        frozen: false
-      });
+    function addDots(n = 1) {
+      for (let i = 0; i < n; i++) {
+        dots.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: Math.random() * 2 + 1,
+          vx: Math.random() * 0.6 - 0.3,
+          vy: Math.random() * 0.6 - 0.3,
+          frozen: false
+        });
+      }
     }
+    addDots(NUM_DOTS);
 
     const mouse = { x: null, y: null };
     const snapshots = [];
-    let sectorClosest = [null, null, null, null];
+    const areas = [];
+    let score = 0;
+    let showScore = false;
 
     function findClosestDots(cx, cy) {
       const angleOffset = Math.PI / 4;
@@ -89,26 +94,25 @@
       return closest;
     }
 
-    function drawShape(center, arms, style = "#00ccff") {
+    function drawBlob(center, arms, color = "#00ccff") {
       const points = arms.filter(Boolean);
-      if (points.length < 4) return;
+      if (points.length === 0) return;
 
       ctx.beginPath();
       points.forEach(p => {
         ctx.moveTo(center.x, center.y);
         ctx.lineTo(p.x, p.y);
-        ctx.strokeStyle = style;
-        ctx.lineWidth = 3;
-        ctx.stroke();
       });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
       ctx.beginPath();
       ctx.arc(center.x, center.y, 10, 0, Math.PI * 2);
-      ctx.fillStyle = style;
+      ctx.fillStyle = color;
       ctx.fill();
 
-      // Draw "RM"
-      ctx.fillStyle = style;
+      ctx.fillStyle = color;
       ctx.font = "bold 12px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -117,9 +121,26 @@
       points.forEach(p => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-        ctx.fillStyle = style;
+        ctx.fillStyle = color;
         ctx.fill();
       });
+    }
+
+    function drawArea(area) {
+      const points = area.points.map(p => ({ x: p.x, y: p.y }));
+      const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+      const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+
+      points.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = "rgba(0,255,153,0.3)";
+      ctx.fill();
     }
 
     function draw() {
@@ -144,19 +165,38 @@
       });
 
       if (mouse.x !== null && mouse.y !== null) {
-        sectorClosest = findClosestDots(mouse.x, mouse.y);
-        drawShape({ x: mouse.x, y: mouse.y }, sectorClosest, "#007799"); // muted color
+        const preview = findClosestDots(mouse.x, mouse.y);
+        drawBlob({ x: mouse.x, y: mouse.y }, preview, "#007799");
       }
+
+      areas.forEach(drawArea);
 
       snapshots.forEach(snap => {
         snap.center.y += snap.vy;
         snap.dots.forEach(dot => {
           if (dot) dot.y += snap.vy;
         });
-        drawShape(snap.center, snap.dots);
+        drawBlob(snap.center, snap.dots, snap.color);
       });
 
+      // Auto-reset score if all snapshots have flown off screen
+      if (score > 0 && snapshots.every(s => s.center.y < -50)) {
+        score = 0;
+        showScore = false;
+      }
+
       requestAnimationFrame(draw);
+    }
+
+    function dotsMatch(d1, d2) {
+      return d1 && d2 && Math.abs(d1.x - d2.x) < 1 && Math.abs(d1.y - d2.y) < 1;
+    }
+
+    function isSamePolygon(p1, p2) {
+      if (p1.length !== p2.length) return false;
+      const sorted1 = [...p1].map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).sort();
+      const sorted2 = [...p2].map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).sort();
+      return sorted1.every((v, i) => v === sorted2[i]);
     }
 
     function freezeBlob(x, y) {
@@ -168,11 +208,42 @@
           dot.vy /= 3;
         }
       });
-      snapshots.push({
-        center: { x, y },
+
+      const newCenter = { x, y };
+      const newSnap = {
+        center: newCenter,
         dots: closest,
-        vy: -0.3
+        vy: -0.15,
+        color: "#00ccff"
+      };
+
+      const matchingDots = [];
+      const pointsSet = [newCenter];
+
+      snapshots.forEach(prev => {
+        prev.dots.forEach(prevDot => {
+          closest.forEach(newDot => {
+            if (dotsMatch(prevDot, newDot)) {
+              if (!matchingDots.includes(prevDot)) matchingDots.push(prevDot);
+              if (!pointsSet.includes(prev.center)) pointsSet.push(prev.center);
+              if (!pointsSet.includes(prevDot)) pointsSet.push(prevDot);
+            }
+          });
+        });
       });
+
+      if (matchingDots.length >= 2 && pointsSet.length >= 3) {
+        // Check uniqueness
+        const alreadyExists = areas.some(area => isSamePolygon(area.points, pointsSet));
+        if (!alreadyExists) {
+          areas.push({ points: pointsSet });
+          score++;
+          showScore = true;
+        }
+      }
+
+      snapshots.push(newSnap);
+      addDots(closest.filter(Boolean).length);
     }
 
     document.addEventListener("mousemove", e => {
@@ -190,6 +261,24 @@
     canvas.addEventListener("touchend", e => {
       if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
     });
+
+    const scoreLabel = document.createElement("div");
+    scoreLabel.style.position = "fixed";
+    scoreLabel.style.bottom = "24px";
+    scoreLabel.style.left = "50%";
+    scoreLabel.style.transform = "translateX(-50%)";
+    scoreLabel.style.color = "#00ff99";
+    scoreLabel.style.fontFamily = "monospace";
+    scoreLabel.style.fontSize = "14px";
+    scoreLabel.style.userSelect = "none";
+    scoreLabel.style.pointerEvents = "none";
+    scoreLabel.style.display = "none";
+    document.body.appendChild(scoreLabel);
+
+    setInterval(() => {
+      scoreLabel.textContent = `Score: ${score}`;
+      scoreLabel.style.display = showScore ? "block" : "none";
+    }, 100);
 
     draw();
   </script>
