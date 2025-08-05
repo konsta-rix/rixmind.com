@@ -1,286 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>- Rixmind -</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #001f3f;
-      overflow: hidden;
-      height: 100%;
-    }
-    canvas {
-      display: block;
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-    }
-    #version-label {
-      position: fixed;
-      bottom: 6px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #00ccff;
-      font-family: monospace;
-      font-size: 10px;
-      opacity: 0.3;
-      pointer-events: none;
-      user-select: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IT Asset, Software & Service Management Solutions | Rixmind</title>
+<meta name="description" content="Our website is under construction. Stay tuned for updates and exciting news about our upcoming services.">
+<meta name="robots" content="index,follow">
+<meta name="author" content="Rixmind SIA">
+<link rel="icon" type="image/png" href="favicon.ico">
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <canvas id="bg"></canvas>
-  <div id="version-label">ver.019</div>
 
-  <script>
-    const canvas = document.getElementById("bg");
-    const ctx = canvas.getContext("2d");
-    let w, h;
-    function resize() {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resize);
-    resize();
+<div class="container">
+    <!-- Left Column -->
+    <div class="left-column">
+        <div class="logo">
+            <img src="logo.png" alt="Company Logo">
+        </div>
 
-    const dots = [];
-    const NUM_DOTS = 100;
-    function addDots(n = 1) {
-      for (let i = 0; i < n; i++) {
-        dots.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          r: Math.random() * 2 + 1,
-          vx: Math.random() * 0.6 - 0.3,
-          vy: Math.random() * 0.6 - 0.3,
-          frozen: false
-        });
-      }
-    }
-    addDots(NUM_DOTS);
+        <div class="content">
+            <div class="text-block">
+                <h1>We’re putting the final touches on the platform, but always ready for a conversation.</h1>
+                <p>Need ITAM or ITSM support today?</br> Let’s talk: <span id="email-holder"></span></p>
+                <div class="follow-block">
+                  <p>Stay updated - follow us on LinkedIn</p>
+                  <a href="https://www.linkedin.com/company/rixmind" target="_blank" class="linkedin-logo">
+                   <img src="linkedin.svg" alt="LinkedIn">
+                 </a>
+        </div>
+            </div>
 
-    const mouse = { x: null, y: null };
-    const snapshots = [];
-    const areas = [];
-    let score = 0;
-    let showScore = false;
+        </div>
+    </div>
 
-    function findClosestDots(cx, cy) {
-      const angleOffset = Math.PI / 4;
-      const closest = [null, null, null, null];
-      const closestDist = [Infinity, Infinity, Infinity, Infinity];
+    <!-- Right Column -->
+    <div class="right-column">
+        <img src="under_construction.png" alt="Illustration: Website Under Construction">
+    </div>
+</div>
 
-      dots.forEach(dot => {
-        const dx = dot.x - cx;
-        const dy = dot.y - cy;
-        const dist2 = dx * dx + dy * dy;
-        const angle = (Math.atan2(dy, dx) + 2 * Math.PI) % (2 * Math.PI);
-        const sector = Math.floor((angle - angleOffset + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 2));
-        const angleInSector = (angle - (sector * Math.PI / 2) + angleOffset) % (Math.PI / 2);
-        const minAngle = Math.PI / 8;
-        const maxAngle = 3 * Math.PI / 8;
-        if (angleInSector >= minAngle && angleInSector <= maxAngle) {
-          if (dist2 < closestDist[sector]) {
-            closestDist[sector] = dist2;
-            closest[sector] = dot;
-          }
-        }
-      });
+<footer class="footer">
+    <p>© 2025 RIXMIND SIA. All rights reserved.</p>
+</footer>
 
-      return closest;
-    }
+<script src="script.js"></script>
 
-    function drawBlob(center, arms, color = "#00ccff") {
-      const points = arms.filter(Boolean);
-      if (points.length === 0) return;
-
-      ctx.beginPath();
-      points.forEach(p => {
-        ctx.moveTo(center.x, center.y);
-        ctx.lineTo(p.x, p.y);
-      });
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(center.x, center.y, 10, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-
-      ctx.fillStyle = color;
-      ctx.font = "bold 12px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("RM", center.x, center.y);
-
-      points.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-      });
-    }
-
-    function drawArea(area) {
-      const points = area.points.map(p => ({ x: p.x, y: p.y }));
-      const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-      const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-
-      points.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
-      }
-      ctx.closePath();
-      ctx.fillStyle = "rgba(0,255,153,0.3)";
-      ctx.fill();
-    }
-
-    function draw() {
-      ctx.fillStyle = "#001f3f";
-      ctx.fillRect(0, 0, w, h);
-
-      dots.forEach(dot => {
-        if (!dot.frozen) {
-          dot.x += dot.vx;
-          dot.y += dot.vy;
-          if (dot.x < 0 || dot.x > w) dot.vx *= -1;
-          if (dot.y < 0 || dot.y > h) dot.vy *= -1;
-        } else {
-          dot.x += dot.vx / 3;
-          dot.y += dot.vy / 3;
-        }
-
-        ctx.beginPath();
-        ctx.arc(dot.x, dot.y, Math.max(dot.r, 4), 0, Math.PI * 2);
-        ctx.fillStyle = "#00ccff";
-        ctx.fill();
-      });
-
-      if (mouse.x !== null && mouse.y !== null) {
-        const preview = findClosestDots(mouse.x, mouse.y);
-        drawBlob({ x: mouse.x, y: mouse.y }, preview, "#007799");
-      }
-
-      areas.forEach(drawArea);
-
-      snapshots.forEach(snap => {
-        snap.center.y += snap.vy;
-        snap.dots.forEach(dot => {
-          if (dot) dot.y += snap.vy;
-        });
-        drawBlob(snap.center, snap.dots, snap.color);
-      });
-
-      // Auto-reset score if all snapshots have flown off screen
-      if (score > 0 && snapshots.every(s => s.center.y < -50)) {
-        score = 0;
-        showScore = false;
-      }
-
-      requestAnimationFrame(draw);
-    }
-
-    function dotsMatch(d1, d2) {
-      return d1 && d2 && Math.abs(d1.x - d2.x) < 1 && Math.abs(d1.y - d2.y) < 1;
-    }
-
-    function isSamePolygon(p1, p2) {
-      if (p1.length !== p2.length) return false;
-      const sorted1 = [...p1].map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).sort();
-      const sorted2 = [...p2].map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).sort();
-      return sorted1.every((v, i) => v === sorted2[i]);
-    }
-
-    function freezeBlob(x, y) {
-      const closest = findClosestDots(x, y);
-      closest.forEach(dot => {
-        if (dot) {
-          dot.frozen = true;
-          dot.vx /= 3;
-          dot.vy /= 3;
-        }
-      });
-
-      const newCenter = { x, y };
-      const newSnap = {
-        center: newCenter,
-        dots: closest,
-        vy: -0.15,
-        color: "#00ccff"
-      };
-
-      const matchingDots = [];
-      const pointsSet = [newCenter];
-
-      snapshots.forEach(prev => {
-        prev.dots.forEach(prevDot => {
-          closest.forEach(newDot => {
-            if (dotsMatch(prevDot, newDot)) {
-              if (!matchingDots.includes(prevDot)) matchingDots.push(prevDot);
-              if (!pointsSet.includes(prev.center)) pointsSet.push(prev.center);
-              if (!pointsSet.includes(prevDot)) pointsSet.push(prevDot);
-            }
-          });
-        });
-      });
-
-      if (matchingDots.length >= 2 && pointsSet.length >= 3) {
-        // Check uniqueness
-        const alreadyExists = areas.some(area => isSamePolygon(area.points, pointsSet));
-        if (!alreadyExists) {
-          areas.push({ points: pointsSet });
-          score++;
-          showScore = true;
-        }
-      }
-
-      snapshots.push(newSnap);
-      addDots(closest.filter(Boolean).length);
-    }
-
-    document.addEventListener("mousemove", e => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-    });
-    document.addEventListener("click", e => {
-      if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
-    });
-    canvas.addEventListener("touchstart", e => {
-      const touch = e.touches[0];
-      mouse.x = touch.clientX;
-      mouse.y = touch.clientY;
-    });
-    canvas.addEventListener("touchend", e => {
-      if (mouse.x !== null && mouse.y !== null) freezeBlob(mouse.x, mouse.y);
-    });
-
-    const scoreLabel = document.createElement("div");
-    scoreLabel.style.position = "fixed";
-    scoreLabel.style.bottom = "24px";
-    scoreLabel.style.left = "50%";
-    scoreLabel.style.transform = "translateX(-50%)";
-    scoreLabel.style.color = "#00ff99";
-    scoreLabel.style.fontFamily = "monospace";
-    scoreLabel.style.fontSize = "14px";
-    scoreLabel.style.userSelect = "none";
-    scoreLabel.style.pointerEvents = "none";
-    scoreLabel.style.display = "none";
-    document.body.appendChild(scoreLabel);
-
-    setInterval(() => {
-      scoreLabel.textContent = `Score: ${score}`;
-      scoreLabel.style.display = showScore ? "block" : "none";
-    }, 100);
-
-    draw();
-  </script>
 </body>
 </html>
