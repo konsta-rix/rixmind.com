@@ -8,20 +8,20 @@ html, body {
   font-family: 'Open Sans', Arial, sans-serif;
 }
 
-/* NEW: content wrapper that expands */
+/* Content wrapper that expands */
 .page-wrapper {
   flex: 1;
-  padding: 10px 50px 0 50px;  /* your original top/left/right padding */
+  padding: 10px 50px 0 50px;
   box-sizing: border-box;
 }
 
 .grid-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto; /* let rows size based on content */
+  grid-template-rows: auto auto;
   padding: 15px 30px 1px 30px;
-  row-gap: 5px;    /* vertical spacing between rows */
-  column-gap: 40px; /* spacing between columns */
+  row-gap: 5px;
+  column-gap: 40px;
   box-sizing: border-box;
 }
 
@@ -99,6 +99,7 @@ html, body {
   height: 31px;
 }
 
+/* Contact list styles */
 .location-entry {
   margin-bottom: 12px;
 }
@@ -118,8 +119,7 @@ html, body {
   font-weight: normal;
 }
 
-
-
+/* Partners section */
 .partners-section {
   margin-top: 0px;
 }
@@ -132,19 +132,18 @@ html, body {
 
 .partner-logos {
   display: grid;
-  grid-template-columns: repeat(3, auto); /* 3 columns, auto-width */
-  column-gap: 40px;   /* reduce horizontal spacing */
-  row-gap: 20px;      /* reduce vertical spacing */
+  grid-template-columns: repeat(3, auto);
+  column-gap: 40px;
+  row-gap: 20px;
   align-items: center;
-  justify-content: start; /* align the grid block to the left */
+  justify-content: center;
 }
 
 .partner-logos img {
-  height: 35px;       /* uniform vertical size */
+  height: 35px;
   width: auto;
   object-fit: contain;
 }
-
 
 /* Footer */
 .footer {
@@ -155,10 +154,48 @@ html, body {
   padding: 10px 0;
 }
 
-/* Responsive: stack on smaller screens */
+/* Responsive: stack and adjust on smaller screens */
 @media (max-width: 768px) {
+  .page-wrapper {
+    padding: 10px 15px 0 15px;
+  }
+
   .grid-container {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto auto;
+    column-gap: 0;
+    row-gap: 20px;
+  }
+
+  .logo-cell,
+  .image-cell {
+    justify-content: center;
+  }
+
+  .text-cell h1 {
+    font-size: 1.6rem;
+  }
+
+  .text-cell p {
+    font-size: 1rem;
+  }
+
+  .partners-section h2 {
+    font-size: 1.3rem;
+  }
+
+  .partner-logos {
+    grid-template-columns: repeat(2, auto);
+    column-gap: 20px;
+    row-gap: 16px;
+    justify-content: center;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  .partner-logos {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 }
